@@ -91,10 +91,23 @@ const CsvUploadDialog = ({ categories }: { categories: any[] }) => {
     if (!parsed.length) return;
     setUploading(true);
 
-    const catMap = new Map(categories.map((c: any) => [c.slug, c.id]));
-    const errs: string[] = [];
-    const payload = parsed
-      .map((p, i) => {
+    const catMap = new Map<string, string>();
+    const categoryAliases: Record<string, string[]> = {
+      processador: ["cpu", "processador"],
+      "placa-de-video": ["gpu", "placa de video", "placa-de-video", "placadevideo"],
+      "placa-mae": ["placamae", "placa mae", "placa-mae", "motherboard"],
+      "memoria-ram": ["ram", "memoria-ram", "memoria ram", "memoriaram"],
+      armazenamento: ["storage", "ssd", "hd", "armazenamento", "ssd/hd"],
+      fonte: ["fonte", "psu"],
+      gabinete: ["gabinete", "case"],
+      cooler: ["cooler"],
+    };
+    categories.forEach((c: any) => {
+      catMap.set(c.slug.toLowerCase(), c.id);
+      catMap.set(c.name.toLowerCase(), c.id);
+      const aliases = categoryAliases[c.slug];
+      if (aliases) aliases.forEach((a) => catMap.set(a, c.id));
+    });
         const catId = catMap.get(p.category_slug);
         if (!catId) { errs.push(`"${p.name}": categoria "${p.category_slug}" não encontrada`); return null; }
         return { name: p.name, brand: p.brand || null, price: p.price, stock: p.stock, category_id: catId, specs: p.specs };
