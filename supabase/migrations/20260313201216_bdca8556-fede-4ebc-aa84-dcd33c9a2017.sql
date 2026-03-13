@@ -1,0 +1,1 @@
+CREATE POLICY "Anyone can insert products" ON public.products FOR INSERT TO public WITH CHECK (true);
