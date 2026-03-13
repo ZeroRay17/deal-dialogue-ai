@@ -25,17 +25,26 @@ const CsvUploadDialog = ({ categories }: { categories: any[] }) => {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const parseCsv = (text: string) => {
-    const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+    const lines = text.replace(/^\uFEFF/, "").split("\n").map((l) => l.trim()).filter(Boolean);
     if (lines.length < 2) {
       setErrors(["O arquivo precisa ter um cabeçalho e pelo menos uma linha de dados."]);
       return;
     }
 
     const header = lines[0].split(",").map((h) => h.trim().toLowerCase());
-    const required = ["name", "price", "category"];
-    const missing = required.filter((r) => !header.includes(r));
-    if (missing.length) {
-      setErrors([`Colunas obrigatórias faltando: ${missing.join(", ")}`]);
+    const colMap: Record<string, string> = {
+      nome: "name", name: "name",
+      preco: "price", price: "price",
+      categoria: "category", category: "category",
+      marca: "brand", brand: "brand",
+      estoque: "stock", stock: "stock",
+      link: "link",
+      specs: "specs",
+    };
+
+    const mapped = header.map((h) => colMap[h] || h);
+    if (!mapped.includes("name") || !mapped.includes("price") || !mapped.includes("category")) {
+      setErrors([`Colunas obrigatórias faltando. Esperado: nome/name, preco/price, categoria/category`]);
       return;
     }
 
@@ -45,7 +54,7 @@ const CsvUploadDialog = ({ categories }: { categories: any[] }) => {
     for (let i = 1; i < lines.length; i++) {
       const values = lines[i].split(",").map((v) => v.trim());
       const row: Record<string, string> = {};
-      header.forEach((h, idx) => (row[h] = values[idx] || ""));
+      mapped.forEach((h, idx) => (row[h] = values[idx] || ""));
 
       if (!row.name) { errs.push(`Linha ${i + 1}: nome vazio`); continue; }
       const price = parseFloat(row.price);
@@ -82,11 +91,27 @@ const CsvUploadDialog = ({ categories }: { categories: any[] }) => {
     if (!parsed.length) return;
     setUploading(true);
 
-    const catMap = new Map(categories.map((c: any) => [c.slug, c.id]));
+    const catMap = new Map<string, string>();
+    const categoryAliases: Record<string, string[]> = {
+      processador: ["cpu", "processador"],
+      "placa-de-video": ["gpu", "placa de video", "placa-de-video", "placadevideo"],
+      "placa-mae": ["placamae", "placa mae", "placa-mae", "motherboard"],
+      "memoria-ram": ["ram", "memoria-ram", "memoria ram", "memoriaram"],
+      armazenamento: ["storage", "ssd", "hd", "armazenamento", "ssd/hd"],
+      fonte: ["fonte", "psu"],
+      gabinete: ["gabinete", "case"],
+      cooler: ["cooler"],
+    };
+    categories.forEach((c: any) => {
+      catMap.set(c.slug.toLowerCase(), c.id);
+      catMap.set(c.name.toLowerCase(), c.id);
+      const aliases = categoryAliases[c.slug];
+      if (aliases) aliases.forEach((a) => catMap.set(a, c.id));
+    });
     const errs: string[] = [];
     const payload = parsed
-      .map((p, i) => {
-        const catId = catMap.get(p.category_slug);
+      .map((p) => {
+        const catId = catMap.get(p.category_slug.toLowerCase());
         if (!catId) { errs.push(`"${p.name}": categoria "${p.category_slug}" não encontrada`); return null; }
         return { name: p.name, brand: p.brand || null, price: p.price, stock: p.stock, category_id: catId, specs: p.specs };
       })
@@ -133,9 +158,8 @@ const CsvUploadDialog = ({ categories }: { categories: any[] }) => {
 
           <div className="rounded-md bg-muted p-3 text-xs text-muted-foreground space-y-1">
             <p className="font-semibold">Formato esperado (colunas):</p>
-            <code>name, brand, price, stock, category, specs</code>
-            <p><strong>name, price, category</strong> são obrigatórios. <strong>category</strong> usa o slug (ex: processador, placa-mae, memoria-ram).</p>
-            <p><strong>specs</strong> é opcional, em formato JSON (ex: {`{"cores":6}`}).</p>
+            <p><code>nome, preco, categoria</code> (obrigatórias) + <code>marca, estoque, link, specs</code> (opcionais)</p>
+            <p><strong>categoria</strong> aceita: CPU, GPU, PlacaMae, RAM, Storage, Fonte, Gabinete, Cooler (ou os slugs do sistema).</p>
           </div>
 
           {errors.length > 0 && (
