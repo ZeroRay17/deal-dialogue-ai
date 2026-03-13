@@ -108,7 +108,10 @@ const CsvUploadDialog = ({ categories }: { categories: any[] }) => {
       const aliases = categoryAliases[c.slug];
       if (aliases) aliases.forEach((a) => catMap.set(a, c.id));
     });
-        const catId = catMap.get(p.category_slug);
+    const errs: string[] = [];
+    const payload = parsed
+      .map((p) => {
+        const catId = catMap.get(p.category_slug.toLowerCase());
         if (!catId) { errs.push(`"${p.name}": categoria "${p.category_slug}" não encontrada`); return null; }
         return { name: p.name, brand: p.brand || null, price: p.price, stock: p.stock, category_id: catId, specs: p.specs };
       })
