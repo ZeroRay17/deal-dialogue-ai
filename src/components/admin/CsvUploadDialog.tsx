@@ -158,9 +158,8 @@ const CsvUploadDialog = ({ categories }: { categories: any[] }) => {
 
           <div className="rounded-md bg-muted p-3 text-xs text-muted-foreground space-y-1">
             <p className="font-semibold">Formato esperado (colunas):</p>
-            <code>nome, preco, categoria</code> (obrigatórias) + <code>marca, estoque, link, specs</code> (opcionais)
+            <p><code>nome, preco, categoria</code> (obrigatórias) + <code>marca, estoque, link, specs</code> (opcionais)</p>
             <p><strong>categoria</strong> aceita: CPU, GPU, PlacaMae, RAM, Storage, Fonte, Gabinete, Cooler (ou os slugs do sistema).</p>
-          </div>
           </div>
 
           {errors.length > 0 && (
