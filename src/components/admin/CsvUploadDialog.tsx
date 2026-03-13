@@ -25,17 +25,26 @@ const CsvUploadDialog = ({ categories }: { categories: any[] }) => {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const parseCsv = (text: string) => {
-    const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+    const lines = text.replace(/^\uFEFF/, "").split("\n").map((l) => l.trim()).filter(Boolean);
     if (lines.length < 2) {
       setErrors(["O arquivo precisa ter um cabeçalho e pelo menos uma linha de dados."]);
       return;
     }
 
     const header = lines[0].split(",").map((h) => h.trim().toLowerCase());
-    const required = ["name", "price", "category"];
-    const missing = required.filter((r) => !header.includes(r));
-    if (missing.length) {
-      setErrors([`Colunas obrigatórias faltando: ${missing.join(", ")}`]);
+    const colMap: Record<string, string> = {
+      nome: "name", name: "name",
+      preco: "price", price: "price",
+      categoria: "category", category: "category",
+      marca: "brand", brand: "brand",
+      estoque: "stock", stock: "stock",
+      link: "link",
+      specs: "specs",
+    };
+
+    const mapped = header.map((h) => colMap[h] || h);
+    if (!mapped.includes("name") || !mapped.includes("price") || !mapped.includes("category")) {
+      setErrors([`Colunas obrigatórias faltando. Esperado: nome/name, preco/price, categoria/category`]);
       return;
     }
 
@@ -45,7 +54,7 @@ const CsvUploadDialog = ({ categories }: { categories: any[] }) => {
     for (let i = 1; i < lines.length; i++) {
       const values = lines[i].split(",").map((v) => v.trim());
       const row: Record<string, string> = {};
-      header.forEach((h, idx) => (row[h] = values[idx] || ""));
+      mapped.forEach((h, idx) => (row[h] = values[idx] || ""));
 
       if (!row.name) { errs.push(`Linha ${i + 1}: nome vazio`); continue; }
       const price = parseFloat(row.price);
