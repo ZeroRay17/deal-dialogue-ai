@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Trash2, Edit } from "lucide-react";
 import { toast } from "sonner";
+import CsvUploadDialog from "./CsvUploadDialog";
 
 const ProductsPanel = () => {
   const queryClient = useQueryClient();
@@ -102,7 +103,9 @@ const ProductsPanel = () => {
           <h2 className="text-2xl font-bold text-foreground">Produtos</h2>
           <p className="text-muted-foreground">Gerencie seu catálogo de peças</p>
         </div>
-        <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) resetForm(); }}>
+        <div className="flex gap-2">
+          <CsvUploadDialog categories={categories || []} />
+          <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) resetForm(); }}>
           <DialogTrigger asChild>
             <Button className="gap-2">
               <Plus className="h-4 w-4" /> Adicionar
@@ -156,7 +159,8 @@ const ProductsPanel = () => {
               </Button>
             </DialogFooter>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </div>
 
       <Card>
