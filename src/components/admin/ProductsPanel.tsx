@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Trash2, Edit } from "lucide-react";
 import { toast } from "sonner";
+import CsvUploadDialog from "./CsvUploadDialog";
 
 const ProductsPanel = () => {
   const queryClient = useQueryClient();
