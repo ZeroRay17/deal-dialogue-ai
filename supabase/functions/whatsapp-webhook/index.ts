@@ -18,30 +18,28 @@ serve(async (req) => {
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  const TWILIO_API_KEY = Deno.env.get("TWILIO_API_KEY");
 
   if (!LOVABLE_API_KEY) {
     return new Response("LOVABLE_API_KEY not configured", { status: 500, headers: corsHeaders });
-  }
-  if (!TWILIO_API_KEY) {
-    return new Response("TWILIO_API_KEY not configured", { status: 500, headers: corsHeaders });
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   try {
-    // Twilio sends form-urlencoded data
     const contentType = req.headers.get("content-type") || "";
     let from = "";
+    let to = "";
     let body = "";
 
     if (contentType.includes("application/x-www-form-urlencoded")) {
       const formData = await req.formData();
       from = formData.get("From")?.toString() || "";
+      to = formData.get("To")?.toString() || "";
       body = formData.get("Body")?.toString() || "";
     } else {
       const json = await req.json();
       from = json.From || json.from || "";
+      to = json.To || json.to || "";
       body = json.Body || json.body || "";
     }
 
@@ -52,7 +50,24 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Message from ${from}: ${body}`);
+    console.log(`Message from ${from} to ${to}: ${body}`);
+
+    // Resolve which Twilio account received this message
+    const toNormalized = to.replace("whatsapp:", "");
+    const { data: twilioAccount } = await supabase
+      .from("twilio_accounts")
+      .select("id, phone_number, api_key")
+      .eq("is_active", true)
+      .or(`phone_number.eq.${toNormalized},phone_number.eq.whatsapp:${toNormalized}`)
+      .maybeSingle();
+
+    // Fall back to env var if no DB account matched (backwards compat)
+    const TWILIO_API_KEY = twilioAccount?.api_key ?? Deno.env.get("TWILIO_API_KEY");
+    const fromNumber = twilioAccount?.phone_number ?? "+14155238886";
+
+    if (!TWILIO_API_KEY) {
+      return new Response("No Twilio account configured for this number", { status: 500, headers: corsHeaders });
+    }
 
     // Find or create conversation
     let { data: conversation } = await supabase
@@ -65,7 +80,10 @@ serve(async (req) => {
     if (!conversation) {
       const { data: newConv, error: convError } = await supabase
         .from("conversations")
-        .insert({ whatsapp_number: from })
+        .insert({
+          whatsapp_number: from,
+          twilio_account_id: twilioAccount?.id ?? null,
+        })
         .select("id")
         .single();
 
@@ -162,7 +180,7 @@ REGRAS:
       content: reply,
     });
 
-    // Send reply via Twilio WhatsApp
+    // Send reply via the matched Twilio account
     const twilioResponse = await fetch(`${GATEWAY_URL}/Messages.json`, {
       method: "POST",
       headers: {
@@ -172,7 +190,7 @@ REGRAS:
       },
       body: new URLSearchParams({
         To: from,
-        From: from.startsWith("whatsapp:") ? "whatsapp:+14155238886" : "+14155238886",
+        From: from.startsWith("whatsapp:") ? `whatsapp:${fromNumber}` : fromNumber,
         Body: reply,
       }),
     });
@@ -182,7 +200,6 @@ REGRAS:
       console.error("Twilio error:", twilioResponse.status, twilioErr);
     }
 
-    // Return TwiML empty response (Twilio expects this)
     return new Response(
       '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
       { headers: { ...corsHeaders, "Content-Type": "text/xml" } }

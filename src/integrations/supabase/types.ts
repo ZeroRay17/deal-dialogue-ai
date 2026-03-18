@@ -56,6 +56,7 @@ export type Database = {
           customer_name: string | null
           id: string
           status: string
+          twilio_account_id: string | null
           updated_at: string
           whatsapp_number: string
         }
@@ -64,6 +65,7 @@ export type Database = {
           customer_name?: string | null
           id?: string
           status?: string
+          twilio_account_id?: string | null
           updated_at?: string
           whatsapp_number: string
         }
@@ -72,8 +74,44 @@ export type Database = {
           customer_name?: string | null
           id?: string
           status?: string
+          twilio_account_id?: string | null
           updated_at?: string
           whatsapp_number?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_twilio_account_id_fkey"
+            columns: ["twilio_account_id"]
+            isOneToOne: false
+            referencedRelation: "twilio_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      twilio_accounts: {
+        Row: {
+          api_key: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          phone_number: string
+        }
+        Insert: {
+          api_key: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          phone_number: string
+        }
+        Update: {
+          api_key?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          phone_number?: string
         }
         Relationships: []
       }
