@@ -1,6 +1,7 @@
-import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Package, MessageSquare, Settings, Cpu } from "lucide-react";
+import { Package, MessageSquare, Settings, Cpu, LogOut } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 import ProductsPanel from "@/components/admin/ProductsPanel";
 import ConversationsPanel from "@/components/admin/ConversationsPanel";
 import DashboardPanel from "@/components/admin/DashboardPanel";
@@ -15,10 +16,19 @@ const Index = () => {
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
             <Cpu className="h-5 w-5 text-primary-foreground" />
           </div>
-          <div>
+          <div className="flex-1">
             <h1 className="text-lg font-bold text-foreground">PC Builder Bot</h1>
             <p className="text-xs text-muted-foreground">Chatbot IA para WhatsApp</p>
           </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-2 text-muted-foreground"
+            onClick={() => supabase.auth.signOut()}
+          >
+            <LogOut className="h-4 w-4" />
+            Sair
+          </Button>
         </div>
       </header>
 

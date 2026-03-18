@@ -2,6 +2,16 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Package, MessageSquare, Users, TrendingUp } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+
+const todayStr = () => new Date().toISOString().split("T")[0];
+
+const last7Days = () =>
+  Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - i));
+    return d.toISOString().split("T")[0];
+  });
 
 const DashboardPanel = () => {
   const { data: productCount } = useQuery({
@@ -31,19 +41,56 @@ const DashboardPanel = () => {
     },
   });
 
-  const { data: messageCount } = useQuery({
-    queryKey: ["message-count"],
+  const { data: todayConversations } = useQuery({
+    queryKey: ["today-conversations"],
     queryFn: async () => {
-      const { count } = await supabase.from("messages").select("*", { count: "exact", head: true });
+      const { count } = await supabase
+        .from("conversations")
+        .select("*", { count: "exact", head: true })
+        .gte("created_at", `${todayStr()}T00:00:00`);
       return count || 0;
     },
   });
 
+  const { data: todayMessages } = useQuery({
+    queryKey: ["today-messages"],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("messages")
+        .select("*", { count: "exact", head: true })
+        .gte("created_at", `${todayStr()}T00:00:00`);
+      return count || 0;
+    },
+  });
+
+  const { data: weeklyData } = useQuery({
+    queryKey: ["weekly-conversations"],
+    queryFn: async () => {
+      const days = last7Days();
+      const { data } = await supabase
+        .from("conversations")
+        .select("created_at")
+        .gte("created_at", `${days[0]}T00:00:00`);
+
+      const counts: Record<string, number> = {};
+      days.forEach((d) => (counts[d] = 0));
+      (data || []).forEach((c) => {
+        const day = c.created_at.split("T")[0];
+        if (counts[day] !== undefined) counts[day]++;
+      });
+
+      return days.map((d) => ({
+        day: new Date(d + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short", day: "numeric" }),
+        conversas: counts[d],
+      }));
+    },
+  });
+
   const stats = [
-    { label: "Produtos", value: productCount ?? 0, icon: Package, color: "text-primary" },
-    { label: "Conversas", value: conversationCount ?? 0, icon: Users, color: "text-accent-foreground" },
-    { label: "Ativas", value: activeConversations ?? 0, icon: TrendingUp, color: "text-success" },
-    { label: "Mensagens", value: messageCount ?? 0, icon: MessageSquare, color: "text-muted-foreground" },
+    { label: "Conversas hoje", value: todayConversations ?? 0, icon: TrendingUp, color: "text-primary" },
+    { label: "Mensagens hoje", value: todayMessages ?? 0, icon: MessageSquare, color: "text-blue-500" },
+    { label: "Conversas ativas", value: activeConversations ?? 0, icon: Users, color: "text-green-500" },
+    { label: "Produtos", value: productCount ?? 0, icon: Package, color: "text-orange-500" },
   ];
 
   return (
@@ -69,14 +116,38 @@ const DashboardPanel = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Como funciona</CardTitle>
+          <CardTitle className="text-base">Conversas — últimos 7 dias</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3 text-sm text-muted-foreground">
-          <p>1. 📦 Cadastre seus produtos na aba <strong>Produtos</strong></p>
-          <p>2. ⚙️ Configure o webhook do Twilio na aba <strong>Configuração</strong></p>
-          <p>3. 💬 Os clientes enviam mensagens no WhatsApp</p>
-          <p>4. 🤖 A IA analisa o pedido e sugere uma configuração do catálogo</p>
-          <p>5. 🛒 O cliente recebe a sugestão com preços e link do carrinho</p>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={weeklyData || []} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="day" tick={{ fontSize: 12 }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+              <Tooltip />
+              <Bar dataKey="conversas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Totais gerais</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
+          <div>
+            <p className="text-muted-foreground">Total de conversas</p>
+            <p className="text-2xl font-bold">{conversationCount}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Produtos no catálogo</p>
+            <p className="text-2xl font-bold">{productCount}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Conversas ativas</p>
+            <p className="text-2xl font-bold">{activeConversations}</p>
+          </div>
         </CardContent>
       </Card>
     </div>
