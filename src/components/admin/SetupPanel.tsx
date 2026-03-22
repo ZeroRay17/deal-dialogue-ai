@@ -1,217 +1,148 @@
-import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Copy, Trash2, Plus, ExternalLink } from "lucide-react";
+import { Copy, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 
-type TwilioAccount = {
-  id: string;
-  name: string;
-  phone_number: string;
-  api_key: string;
-  is_active: boolean;
-};
+const VERIFY_TOKEN = "pcbuilder_verify";
 
 const SetupPanel = () => {
   const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-webhook`;
-
-  const [accounts, setAccounts] = useState<TwilioAccount[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ name: "", phone_number: "", api_key: "" });
-  const [saving, setSaving] = useState(false);
 
   const copy = (text: string) => {
     navigator.clipboard.writeText(text);
     toast.success("Copiado!");
   };
 
-  const fetchAccounts = async () => {
-    const { data, error } = await supabase
-      .from("twilio_accounts")
-      .select("*")
-      .order("created_at");
-    if (error) toast.error("Erro ao carregar contas");
-    else setAccounts(data ?? []);
-    setLoading(false);
-  };
-
-  useEffect(() => { fetchAccounts(); }, []);
-
-  const addAccount = async () => {
-    if (!form.name || !form.phone_number || !form.api_key) {
-      toast.error("Preencha todos os campos");
-      return;
-    }
-    setSaving(true);
-    const { error } = await supabase.from("twilio_accounts").insert({
-      name: form.name,
-      phone_number: form.phone_number,
-      api_key: form.api_key,
-    });
-    setSaving(false);
-    if (error) {
-      toast.error("Erro ao salvar conta");
-    } else {
-      toast.success("Conta adicionada!");
-      setForm({ name: "", phone_number: "", api_key: "" });
-      fetchAccounts();
-    }
-  };
-
-  const toggleAccount = async (id: string, current: boolean) => {
-    const { error } = await supabase
-      .from("twilio_accounts")
-      .update({ is_active: !current })
-      .eq("id", id);
-    if (error) toast.error("Erro ao atualizar");
-    else fetchAccounts();
-  };
-
-  const deleteAccount = async (id: string) => {
-    const { error } = await supabase.from("twilio_accounts").delete().eq("id", id);
-    if (error) toast.error("Erro ao remover");
-    else { toast.success("Conta removida"); fetchAccounts(); }
-  };
-
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-foreground">Configuração</h2>
-        <p className="text-muted-foreground">Configure a integração com WhatsApp via Twilio</p>
+        <p className="text-muted-foreground">Configure a integração com WhatsApp via Meta Cloud API</p>
       </div>
 
       {/* Webhook URL */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Webhook URL</CardTitle>
-          <CardDescription>
-            Cole esta URL no painel do Twilio como webhook para mensagens WhatsApp
-          </CardDescription>
+          <CardDescription>Cole esta URL no painel do Meta para receber mensagens</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
           <div className="flex gap-2">
             <Input value={webhookUrl} readOnly className="font-mono text-xs" />
             <Button variant="outline" size="icon" onClick={() => copy(webhookUrl)}>
               <Copy className="h-4 w-4" />
             </Button>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Twilio Accounts */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Contas Twilio</CardTitle>
-          <CardDescription>
-            Gerencie múltiplas contas Twilio. O webhook roteia automaticamente pelo número de destino.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {loading ? (
-            <p className="text-sm text-muted-foreground">Carregando...</p>
-          ) : accounts.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhuma conta configurada.</p>
-          ) : (
-            <div className="space-y-3">
-              {accounts.map((acc) => (
-                <div key={acc.id} className="flex items-center justify-between rounded-lg border p-3 gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-sm truncate">{acc.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">{acc.phone_number}</p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Badge
-                      variant={acc.is_active ? "default" : "secondary"}
-                      className="cursor-pointer gap-1"
-                      onClick={() => toggleAccount(acc.id, acc.is_active)}
-                    >
-                      {acc.is_active && <CheckCircle className="h-3 w-3" />}
-                      {acc.is_active ? "Ativo" : "Inativo"}
-                    </Badge>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-destructive"
-                      onClick={() => deleteAccount(acc.id)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">Verify Token (use este valor no Meta)</p>
+            <div className="flex gap-2">
+              <Input value={VERIFY_TOKEN} readOnly className="font-mono text-xs" />
+              <Button variant="outline" size="icon" onClick={() => copy(VERIFY_TOKEN)}>
+                <Copy className="h-4 w-4" />
+              </Button>
             </div>
-          )}
-
-          {/* Add account form */}
-          <div className="space-y-3 border-t pt-4">
-            <p className="text-sm font-medium">Adicionar conta</p>
-            <div className="grid gap-2">
-              <div>
-                <Label className="text-xs">Nome</Label>
-                <Input
-                  placeholder="Ex: Conta Principal"
-                  value={form.name}
-                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Número do Twilio</Label>
-                <Input
-                  placeholder="+14155238886"
-                  value={form.phone_number}
-                  onChange={(e) => setForm((f) => ({ ...f, phone_number: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label className="text-xs">API Key (X-Connection-Api-Key)</Label>
-                <Input
-                  type="password"
-                  placeholder="Sua Twilio API Key"
-                  value={form.api_key}
-                  onChange={(e) => setForm((f) => ({ ...f, api_key: e.target.value }))}
-                />
-              </div>
-            </div>
-            <Button onClick={addAccount} disabled={saving} className="w-full gap-2">
-              <Plus className="h-4 w-4" />
-              {saving ? "Salvando..." : "Adicionar Conta"}
-            </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Steps */}
+      {/* Secrets */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Passo a passo</CardTitle>
+          <CardTitle className="text-base">Secrets no Supabase</CardTitle>
+          <CardDescription>
+            Configure estes secrets em{" "}
+            <a
+              href="https://supabase.com/dashboard/project/njvgtjovguunpotragaf/settings/functions"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-primary underline"
+            >
+              Supabase → Settings → Edge Functions <ExternalLink className="h-3 w-3" />
+            </a>
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4 text-sm text-muted-foreground">
+        <CardContent>
+          <div className="space-y-2 text-sm">
+            {[
+              { key: "META_ACCESS_TOKEN", desc: "Token permanente do System User (Meta Business Suite)" },
+              { key: "META_PHONE_NUMBER_ID", desc: "ID do número de telefone (Meta for Developers → WhatsApp → API Setup)" },
+              { key: "META_VERIFY_TOKEN", desc: `Valor fixo: ${VERIFY_TOKEN}` },
+              { key: "OPENAI_API_KEY", desc: "Chave da OpenAI para o chatbot" },
+            ].map(({ key, desc }) => (
+              <div key={key} className="rounded-lg border p-3">
+                <div className="flex items-center justify-between">
+                  <code className="text-xs font-bold">{key}</code>
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copy(key)}>
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Step by step */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Passo a passo — Meta Cloud API</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5 text-sm text-muted-foreground">
           <div className="space-y-2">
-            <p className="font-medium text-foreground">1. Configurar Twilio Sandbox (teste)</p>
+            <p className="font-medium text-foreground">1. Criar conta no Meta for Developers</p>
             <p>
               Acesse{" "}
               <a
-                href="https://console.twilio.com/us1/develop/sms/try-it-out/whatsapp-learn"
+                href="https://developers.facebook.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-primary underline"
+                className="inline-flex items-center gap-1 text-primary underline"
               >
-                Twilio Console → WhatsApp Sandbox
-              </a>
+                developers.facebook.com <ExternalLink className="h-3 w-3" />
+              </a>{" "}
+              e crie um App do tipo <strong>Business</strong>.
             </p>
-            <p>Cole a URL do webhook acima no campo "WHEN A MESSAGE COMES IN"</p>
           </div>
+
           <div className="space-y-2">
-            <p className="font-medium text-foreground">2. Adicionar as contas acima</p>
-            <p>Para cada conta Twilio, insira o número e a API Key correspondente. O webhook detecta automaticamente qual conta responde.</p>
+            <p className="font-medium text-foreground">2. Adicionar o produto WhatsApp</p>
+            <p>No painel do App, clique em <strong>"Add Product"</strong> e selecione <strong>WhatsApp</strong>. Você vai precisar de uma conta Meta Business verificada.</p>
           </div>
+
           <div className="space-y-2">
-            <p className="font-medium text-foreground">3. Testar</p>
-            <p>Envie uma mensagem como "quero montar um PC gamer até R$4000" e a IA responderá com sugestões do catálogo!</p>
+            <p className="font-medium text-foreground">3. Pegar o Phone Number ID e Token</p>
+            <p>
+              Em <strong>WhatsApp → API Setup</strong>, copie o <strong>Phone number ID</strong> e gere um token de acesso permanente via System User no Meta Business Suite.
+            </p>
+            <a
+              href="https://developers.facebook.com/docs/whatsapp/business-management-api/get-started"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-primary underline text-xs"
+            >
+              Documentação oficial <ExternalLink className="h-3 w-3" />
+            </a>
+          </div>
+
+          <div className="space-y-2">
+            <p className="font-medium text-foreground">4. Configurar o webhook no Meta</p>
+            <p>
+              Em <strong>WhatsApp → Configuration → Webhook</strong>, cole a <strong>Webhook URL</strong> e o <strong>Verify Token</strong> acima. Assine o campo <strong>messages</strong>.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <p className="font-medium text-foreground">5. Adicionar os secrets no Supabase</p>
+            <p>Cole os valores de <strong>META_ACCESS_TOKEN</strong>, <strong>META_PHONE_NUMBER_ID</strong> e <strong>META_VERIFY_TOKEN</strong> nas configurações de Edge Functions do Supabase acima.</p>
+          </div>
+
+          <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-green-800 dark:border-green-800 dark:bg-green-900/20 dark:text-green-200">
+            <p className="font-medium">Custo: praticamente zero</p>
+            <p className="mt-1 text-xs">
+              Conversas iniciadas pelo cliente (Service) são <strong>gratuitas</strong> até 1.000/mês. Sem taxa por mensagem do intermediário — você paga só o OpenAI (~$0,001/conversa).
+            </p>
           </div>
         </CardContent>
       </Card>

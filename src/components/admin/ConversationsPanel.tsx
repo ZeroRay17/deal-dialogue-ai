@@ -1,13 +1,20 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useRef, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MessageSquare, User, Bot } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { MessageSquare, User, Bot, Send } from "lucide-react";
+import { toast } from "sonner";
 
 const ConversationsPanel = () => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
 
   const { data: conversations } = useQuery({
     queryKey: ["conversations"],
@@ -33,7 +40,38 @@ const ConversationsPanel = () => {
       return data || [];
     },
     enabled: !!selectedId,
+    refetchInterval: 5000,
   });
+
+  // Scroll to bottom when new messages arrive
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const handleSend = async () => {
+    if (!input.trim() || !selectedId || sending) return;
+    setSending(true);
+    try {
+      const { error } = await supabase.functions.invoke("send-whatsapp", {
+        body: { conversation_id: selectedId, message: input.trim() },
+      });
+      if (error) throw error;
+      setInput("");
+      queryClient.invalidateQueries({ queryKey: ["messages", selectedId] });
+    } catch (e) {
+      toast.error("Erro ao enviar mensagem");
+      console.error(e);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -49,7 +87,7 @@ const ConversationsPanel = () => {
             <CardTitle className="text-sm">Conversas Recentes</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <ScrollArea className="h-[500px]">
+            <ScrollArea className="h-[560px]">
               {conversations?.length === 0 ? (
                 <p className="p-4 text-center text-sm text-muted-foreground">
                   Nenhuma conversa ainda. As conversas aparecerão aqui quando clientes enviarem mensagens no WhatsApp.
@@ -80,14 +118,16 @@ const ConversationsPanel = () => {
         </Card>
 
         {/* Chat view */}
-        <Card className="lg:col-span-2">
+        <Card className="flex flex-col lg:col-span-2">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm">
-              {selectedId ? "Mensagens" : "Selecione uma conversa"}
+              {selectedId
+                ? conversations?.find((c) => c.id === selectedId)?.whatsapp_number ?? "Mensagens"
+                : "Selecione uma conversa"}
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-0">
-            <ScrollArea className="h-[500px] p-4">
+          <CardContent className="flex flex-1 flex-col p-0">
+            <ScrollArea className="h-[460px] p-4">
               {!selectedId ? (
                 <div className="flex h-full items-center justify-center text-muted-foreground">
                   <div className="text-center">
@@ -125,9 +165,30 @@ const ConversationsPanel = () => {
                       </div>
                     </div>
                   ))}
+                  <div ref={bottomRef} />
                 </div>
               )}
             </ScrollArea>
+
+            {/* Input area */}
+            {selectedId && (
+              <div className="border-t p-3">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Digite uma mensagem..."
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    disabled={sending}
+                    className="flex-1"
+                  />
+                  <Button onClick={handleSend} disabled={sending || !input.trim()} size="icon">
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+                <p className="mt-1 text-[10px] text-muted-foreground">Enter para enviar • a mensagem será enviada via WhatsApp</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
