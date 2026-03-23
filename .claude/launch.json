@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Vite Dev Server (Frontend)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 8080
+    },
+    {
+      "name": "Supabase Functions (Local)",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["supabase", "functions", "serve", "whatsapp-webhook"],
+      "port": 54321
+    }
+  ]
+}
